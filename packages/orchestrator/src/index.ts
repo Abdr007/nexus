@@ -84,8 +84,9 @@ export async function* orchestrate(options: OrchestrateOptions): AsyncGenerator<
       yield { type: 'token', content: token };
     }
   } catch (err) {
-    log('error', 'LLM streaming failed', { error: (err as Error).message });
-    yield { type: 'error', content: 'Failed to generate response. Please try again.' };
+    const errMsg = (err as Error).message;
+    log('error', 'LLM streaming failed', { error: errMsg });
+    yield { type: 'error', content: `LLM error: ${errMsg}` };
     return;
   }
 

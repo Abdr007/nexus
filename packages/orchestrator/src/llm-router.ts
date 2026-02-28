@@ -1,5 +1,3 @@
-import Groq from 'groq-sdk';
-import Anthropic from '@anthropic-ai/sdk';
 import { log } from '@nexus/shared';
 
 export interface LLMStreamOptions {
@@ -11,21 +9,131 @@ export interface LLMStreamOptions {
 
 export type Tier = 'free' | 'pro';
 
-let groq: Groq | null = null;
-let anthropic: Anthropic | null = null;
+/**
+ * Stream from Groq API using native fetch (works reliably on Vercel serverless).
+ */
+async function* streamGroq(
+  system: string,
+  user: string,
+  maxTokens: number,
+  temperature: number,
+): AsyncGenerator<{ token: string; model: string }> {
+  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'llama-3.3-70b-versatile',
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: user },
+      ],
+      max_tokens: maxTokens,
+      temperature,
+      stream: true,
+    }),
+  });
 
-function getGroq(): Groq | null {
-  if (!process.env.GROQ_API_KEY) return null;
-  if (groq) return groq;
-  groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
-  return groq;
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Groq API ${res.status}: ${errText}`);
+  }
+
+  const reader = res.body?.getReader();
+  if (!reader) throw new Error('No response body from Groq');
+
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || !trimmed.startsWith('data: ')) continue;
+      const data = trimmed.slice(6);
+      if (data === '[DONE]') return;
+
+      try {
+        const parsed = JSON.parse(data);
+        const token = parsed.choices?.[0]?.delta?.content;
+        if (token) {
+          yield { token, model: 'llama-3.3-70b' };
+        }
+      } catch {
+        // skip malformed chunks
+      }
+    }
+  }
 }
 
-function getAnthropic(): Anthropic | null {
-  if (!process.env.ANTHROPIC_API_KEY) return null;
-  if (anthropic) return anthropic;
-  anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-  return anthropic;
+/**
+ * Stream from Anthropic API using native fetch.
+ */
+async function* streamClaude(
+  system: string,
+  user: string,
+  maxTokens: number,
+  temperature: number,
+): AsyncGenerator<{ token: string; model: string }> {
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'x-api-key': process.env.ANTHROPIC_API_KEY!,
+      'anthropic-version': '2023-06-01',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      max_tokens: maxTokens,
+      temperature,
+      system,
+      messages: [{ role: 'user', content: user }],
+      stream: true,
+    }),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Claude API ${res.status}: ${errText}`);
+  }
+
+  const reader = res.body?.getReader();
+  if (!reader) throw new Error('No response body from Claude');
+
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || !trimmed.startsWith('data: ')) continue;
+      const data = trimmed.slice(6);
+
+      try {
+        const parsed = JSON.parse(data);
+        if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
+          yield { token: parsed.delta.text, model: 'claude-sonnet-4-6' };
+        }
+      } catch {
+        // skip
+      }
+    }
+  }
 }
 
 /**
@@ -40,54 +148,22 @@ export async function* streamLLM(
   const { system, user, maxTokens, temperature } = options;
 
   // Pro tier: try Claude first
-  if (tier === 'pro') {
-    const claude = getAnthropic();
-    if (claude) {
-      try {
-        log('info', 'Using Claude Sonnet for pro tier');
-        const stream = claude.messages.stream({
-          model: 'claude-sonnet-4-6',
-          max_tokens: maxTokens,
-          temperature,
-          system,
-          messages: [{ role: 'user', content: user }],
-        });
-
-        for await (const event of stream) {
-          if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-            yield { token: event.delta.text, model: 'claude-sonnet-4-6' };
-          }
-        }
-        return;
-      } catch (err) {
-        log('warn', 'Claude failed, falling back to Groq', { error: (err as Error).message });
-      }
+  if (tier === 'pro' && process.env.ANTHROPIC_API_KEY) {
+    try {
+      log('info', 'Using Claude Sonnet for pro tier');
+      yield* streamClaude(system, user, maxTokens, temperature);
+      return;
+    } catch (err) {
+      log('warn', 'Claude failed, falling back to Groq', { error: (err as Error).message });
     }
   }
 
   // Free tier or Claude fallback: use Groq
-  const groqClient = getGroq();
-  if (!groqClient) {
+  if (!process.env.GROQ_API_KEY) {
     throw new Error('No LLM provider available');
   }
 
-  const stream = await groqClient.chat.completions.create({
-    model: 'llama-3.3-70b-versatile',
-    messages: [
-      { role: 'system', content: system },
-      { role: 'user', content: user },
-    ],
-    max_tokens: maxTokens,
-    temperature,
-    stream: true,
-  });
-
-  for await (const chunk of stream) {
-    const token = chunk.choices[0]?.delta?.content;
-    if (token) {
-      yield { token, model: 'llama-3.3-70b' };
-    }
-  }
+  yield* streamGroq(system, user, maxTokens, temperature);
 }
 
 export function getAvailableModels(): string[] {
