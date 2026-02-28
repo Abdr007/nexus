@@ -126,6 +126,48 @@ CREATE TABLE IF NOT EXISTS request_logs (
 CREATE INDEX idx_request_logs_user ON request_logs(user_id);
 CREATE INDEX idx_request_logs_created ON request_logs(created_at DESC);
 
+-- ============================================
+-- Price Alerts
+-- ============================================
+CREATE TABLE IF NOT EXISTS price_alerts (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  coingecko_id TEXT NOT NULL,
+  symbol TEXT NOT NULL,
+  target_price NUMERIC NOT NULL,
+  direction TEXT NOT NULL CHECK (direction IN ('above', 'below')),
+  active BOOLEAN DEFAULT true,
+  triggered_at TIMESTAMPTZ,
+  triggered_price NUMERIC,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_alerts_active ON price_alerts(active) WHERE active = true;
+CREATE INDEX idx_alerts_user ON price_alerts(user_id);
+
+ALTER TABLE price_alerts ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can CRUD own alerts" ON price_alerts FOR ALL USING (auth.uid() = user_id);
+
+-- ============================================
+-- Notifications
+-- ============================================
+CREATE TABLE IF NOT EXISTS notifications (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  type TEXT NOT NULL,
+  title TEXT NOT NULL,
+  body TEXT,
+  data JSONB DEFAULT '{}',
+  read BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_notifications_user ON notifications(user_id, created_at DESC);
+
+ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can read own notifications" ON notifications FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can update own notifications" ON notifications FOR UPDATE USING (auth.uid() = user_id);
+
 -- Auto-create user profile on signup
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS TRIGGER

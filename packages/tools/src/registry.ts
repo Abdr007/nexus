@@ -6,6 +6,8 @@ import { cryptoNewsTool } from './crypto-news';
 import { liveSearchTool } from './live-search';
 import { defiTvlTool } from './defi-tvl';
 import { gasTrackerTool } from './gas-tracker';
+import { whaleTrackerTool } from './whale-tracker';
+import { onchainDataTool } from './onchain-data';
 
 const tools: Map<string, ToolConfig> = new Map();
 
@@ -18,6 +20,10 @@ tools.set('live_search', liveSearchTool);
 // Phase 3 tools
 tools.set('defi_tvl', defiTvlTool);
 tools.set('gas_tracker', gasTrackerTool);
+
+// Phase 4 tools
+tools.set('whale_tracker', whaleTrackerTool);
+tools.set('onchain_data', onchainDataTool);
 
 const HINT_TO_TOOL: Record<ToolHint, string[]> = {
   price: ['market_price'],
@@ -45,11 +51,19 @@ export async function dispatchTools(hints: ToolHint[], query: string): Promise<T
   const toolConfigs = resolveTools(hints);
   if (toolConfigs.length === 0) return [];
 
-  // Also check for gas-related keywords
+  // Dynamic tool matching beyond hint system
   const lower = query.toLowerCase();
   if (/\b(gas|gwei|fee|transaction cost)\b/.test(lower) && !toolConfigs.find(t => t.id === 'gas_tracker')) {
     const gasTool = tools.get('gas_tracker');
     if (gasTool) toolConfigs.push(gasTool);
+  }
+  if (/\b(whale|large transaction|big transfer)\b/.test(lower) && !toolConfigs.find(t => t.id === 'whale_tracker')) {
+    const whaleTool = tools.get('whale_tracker');
+    if (whaleTool) toolConfigs.push(whaleTool);
+  }
+  if (/\b(on.?chain|hashrate|difficulty|block height|supply)\b/.test(lower) && !toolConfigs.find(t => t.id === 'onchain_data')) {
+    const onchainTool = tools.get('onchain_data');
+    if (onchainTool) toolConfigs.push(onchainTool);
   }
 
   const start = Date.now();

@@ -134,5 +134,5 @@ export function useChat() {
     setMessages([]);
   }, []);
 
-  return { messages, isStreaming, mode, setMode, sendMessage, stopStreaming, clearMessages };
+  return { messages, setMessages, isStreaming, mode, setMode, sendMessage, stopStreaming, clearMessages };
 }

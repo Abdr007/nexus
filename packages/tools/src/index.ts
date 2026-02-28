@@ -5,3 +5,6 @@ export { cryptoNewsTool } from './crypto-news';
 export { liveSearchTool } from './live-search';
 export { defiTvlTool } from './defi-tvl';
 export { gasTrackerTool } from './gas-tracker';
+export { whaleTrackerTool } from './whale-tracker';
+export { onchainDataTool } from './onchain-data';
+export { registerPlugin, getRegisteredPlugins, unregisterPlugin } from './plugin-loader';
