@@ -8,6 +8,7 @@ import { ChatMessage } from './message';
 import { ChatInput } from './chat-input';
 import { ModeSelector } from './mode-selector';
 import { UserMenu } from '@/components/auth/user-menu';
+import Link from 'next/link';
 
 export function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -83,9 +84,9 @@ export function AppShell() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             </button>
-            <h1 className="text-xl font-bold tracking-tight">
+            <Link href="/" className="text-xl font-bold tracking-tight">
               <span className="text-gradient">N</span>exus
-            </h1>
+            </Link>
             <span className="badge-accent hidden sm:inline-flex">
               Crypto Intelligence
             </span>
