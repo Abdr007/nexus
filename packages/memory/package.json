@@ -1,0 +1,17 @@
+{
+  "name": "@nexus/memory",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@nexus/shared": "*",
+    "@upstash/redis": "^1.34.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  }
+}
