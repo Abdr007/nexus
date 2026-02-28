@@ -4,14 +4,20 @@ import { marketPriceTool } from './market-price';
 import { fearGreedTool } from './fear-greed';
 import { cryptoNewsTool } from './crypto-news';
 import { liveSearchTool } from './live-search';
+import { defiTvlTool } from './defi-tvl';
+import { gasTrackerTool } from './gas-tracker';
 
 const tools: Map<string, ToolConfig> = new Map();
 
-// Register Phase 1 tools
+// Phase 1 tools
 tools.set('market_price', marketPriceTool);
 tools.set('fear_greed', fearGreedTool);
 tools.set('crypto_news', cryptoNewsTool);
 tools.set('live_search', liveSearchTool);
+
+// Phase 3 tools
+tools.set('defi_tvl', defiTvlTool);
+tools.set('gas_tracker', gasTrackerTool);
 
 const HINT_TO_TOOL: Record<ToolHint, string[]> = {
   price: ['market_price'],
@@ -19,7 +25,7 @@ const HINT_TO_TOOL: Record<ToolHint, string[]> = {
   news: ['crypto_news'],
   fear: ['fear_greed'],
   analysis: ['market_price', 'fear_greed'],
-  defi: ['live_search'],
+  defi: ['defi_tvl'],
   portfolio: ['market_price'],
   search: ['live_search'],
 };
@@ -38,6 +44,13 @@ export function resolveTools(hints: ToolHint[]): ToolConfig[] {
 export async function dispatchTools(hints: ToolHint[], query: string): Promise<ToolResult[]> {
   const toolConfigs = resolveTools(hints);
   if (toolConfigs.length === 0) return [];
+
+  // Also check for gas-related keywords
+  const lower = query.toLowerCase();
+  if (/\b(gas|gwei|fee|transaction cost)\b/.test(lower) && !toolConfigs.find(t => t.id === 'gas_tracker')) {
+    const gasTool = tools.get('gas_tracker');
+    if (gasTool) toolConfigs.push(gasTool);
+  }
 
   const start = Date.now();
 

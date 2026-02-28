@@ -1,4 +1,5 @@
 import { ChatInterface } from '@/components/chat/chat-interface';
+import { UserMenu } from '@/components/auth/user-menu';
 
 export default function Home() {
   return (
@@ -13,9 +14,7 @@ export default function Home() {
             Crypto Intelligence
           </span>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-nexus-muted">Phase 1 MVP</span>
-        </div>
+        <UserMenu />
       </header>
 
       {/* Chat */}

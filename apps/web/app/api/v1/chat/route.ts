@@ -1,5 +1,7 @@
 import { NextRequest } from 'next/server';
 import { orchestrate } from '@nexus/orchestrator';
+import { createClient } from '@/lib/supabase/server';
+import { checkRateLimit } from '@/lib/rate-limit';
 import type { Mode } from '@nexus/shared';
 
 export const runtime = 'nodejs';
@@ -18,10 +20,34 @@ export async function POST(req: NextRequest) {
       return Response.json({ error: 'Message too long (max 2000 chars)' }, { status: 400 });
     }
 
-    // For MVP, use a session-based user ID (no auth yet)
-    const userId = req.headers.get('x-session-id') || 'anonymous';
+    // Get authenticated user or fall back to session header
+    let userId = req.headers.get('x-session-id') || 'anonymous';
+    let tier: 'free' | 'pro' = 'free';
 
-    const stream = orchestrate({ message: message.trim(), userId, mode });
+    if (process.env.NEXT_PUBLIC_SUPABASE_URL) {
+      try {
+        const supabase = await createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          userId = user.id;
+          // Check pro tier from user metadata
+          tier = user.user_metadata?.tier === 'pro' ? 'pro' : 'free';
+        }
+      } catch {
+        // Auth not configured — use fallback
+      }
+    }
+
+    // Rate limiting
+    const rateCheck = await checkRateLimit(userId, tier);
+    if (!rateCheck.allowed) {
+      return Response.json(
+        { error: 'Rate limit exceeded. Upgrade to Pro for higher limits.', reset: rateCheck.reset },
+        { status: 429, headers: { 'X-RateLimit-Remaining': '0', 'X-RateLimit-Reset': String(rateCheck.reset) } }
+      );
+    }
+
+    const stream = orchestrate({ message: message.trim(), userId, mode, tier });
 
     const encoder = new TextEncoder();
     const readable = new ReadableStream({
@@ -31,7 +57,7 @@ export async function POST(req: NextRequest) {
             const data = `data: ${JSON.stringify(event)}\n\n`;
             controller.enqueue(encoder.encode(data));
           }
-        } catch (err) {
+        } catch {
           const errorEvent = `data: ${JSON.stringify({ type: 'error', content: 'Stream interrupted' })}\n\n`;
           controller.enqueue(encoder.encode(errorEvent));
         } finally {
@@ -45,6 +71,7 @@ export async function POST(req: NextRequest) {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
         Connection: 'keep-alive',
+        'X-RateLimit-Remaining': String(rateCheck.remaining),
       },
     });
   } catch (err) {
