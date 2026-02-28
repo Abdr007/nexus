@@ -39,7 +39,7 @@ export function ChatInput({ onSend, isStreaming, onStop }: ChatInputProps) {
   };
 
   return (
-    <div className="border-t border-nexus-border bg-nexus-surface px-4 py-3">
+    <div className="glass-surface border-t border-white/[0.06] px-4 py-3">
       <div className="mx-auto flex max-w-3xl items-end gap-2">
         <textarea
           ref={textareaRef}
@@ -48,22 +48,28 @@ export function ChatInput({ onSend, isStreaming, onStop }: ChatInputProps) {
           onKeyDown={handleKeyDown}
           placeholder="Ask about crypto markets, prices, news..."
           rows={1}
-          className="flex-1 resize-none rounded-xl border border-nexus-border bg-nexus-bg px-4 py-3 text-sm text-nexus-text placeholder:text-nexus-muted focus:border-nexus-accent focus:outline-none"
+          className="input-field flex-1 resize-none"
         />
         {isStreaming ? (
           <button
             onClick={onStop}
-            className="rounded-xl bg-nexus-red px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-red-600"
+            className="group flex items-center gap-2 rounded-xl bg-nexus-red px-4 py-3 text-sm font-medium text-white transition-all duration-200 hover:bg-red-600 hover:shadow-glow-red active:scale-95"
           >
-            Stop
+            <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+              <rect x="6" y="6" width="12" height="12" rx="2" />
+            </svg>
+            <span>Stop</span>
           </button>
         ) : (
           <button
             onClick={handleSubmit}
             disabled={!input.trim()}
-            className="rounded-xl bg-nexus-accent px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-nexus-accent-hover disabled:opacity-40 disabled:cursor-not-allowed"
+            className="btn-accent group flex items-center gap-2"
           >
-            Send
+            <span>Send</span>
+            <svg className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
+            </svg>
           </button>
         )}
       </div>
