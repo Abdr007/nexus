@@ -11,7 +11,7 @@ const PLANS = {
     features: [
       '20 messages/hour',
       '3 tools (price, news, sentiment)',
-      'Claude Haiku 4.5',
+      'Groq Llama 3.3 70B',
       'Short-term memory',
     ],
   },
@@ -21,7 +21,7 @@ const PLANS = {
     features: [
       '200 messages/hour',
       'All tools (DeFi, on-chain, whale alerts)',
-      'Claude Sonnet 4.6 for deeper analysis',
+      'Claude Sonnet for deeper analysis',
       'Long-term memory',
       'Portfolio tracking',
       'Conversation history',

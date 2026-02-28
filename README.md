@@ -28,7 +28,7 @@ Nexus is a full-stack AI platform that combines real-time crypto market intellig
 
 ### Key Capabilities
 
-- **Claude-Powered** — Claude Haiku 4.5 (free tier) + Claude Sonnet 4.6 (pro tier)
+- **Multi-LLM Routing** — Groq Llama 3.3 70B (free tier) + Claude Sonnet (pro tier) with automatic fallback
 - **8 Real-Time Tools** — Prices, Fear & Greed, news, web search, DeFi TVL, gas tracker, whale monitoring, on-chain data
 - **4 Analysis Modes** — Analyst, Trader, DeFi, Risk — each with specialized system prompts
 - **Dual-Layer Memory** — Redis short-term (24h) + Supabase pgvector long-term embeddings
@@ -59,16 +59,16 @@ Nexus is a full-stack AI platform that combines real-time crypto market intellig
 │  │  1. Intent Classification (regex-based)             │    │
 │  │  2. Parallel: Tool Dispatch + Memory Retrieval      │    │
 │  │  3. Prompt Assembly (system + tools + memory)       │    │
-│  │  4. LLM Streaming (Claude)                          │    │
+│  │  4. LLM Streaming (Groq / Claude)                  │    │
 │  │  5. Post-process: Memory Persistence                │    │
 │  └──────┬──────────────┬──────────────┬────────────────┘    │
 │         │              │              │                      │
 │  ┌──────▼──────┐ ┌─────▼─────┐ ┌─────▼──────┐              │
 │  │   Tools     │ │  Memory   │ │ LLM Router │              │
 │  │  Registry   │ │  Layer    │ │            │              │
-│  │             │ │           │ │ Haiku(free)│              │
-│  │ 8 tools +   │ │ Redis ST  │ │Sonnet(pro) │              │
-│  │ plugins     │ │ pgvector  │ │            │              │
+│  │             │ │           │ │ Groq (free)│              │
+│  │ 8 tools +   │ │ Redis ST  │ │ Claude(pro)│              │
+│  │ plugins     │ │ pgvector  │ │ + fallback │              │
 │  └─────────────┘ └───────────┘ └────────────┘              │
 └─────────────────────────────────────────────────────────────┘
                              │
@@ -123,8 +123,8 @@ nexus/
 | **Auth** | Supabase Auth (email + Google OAuth) |
 | **Database** | Supabase PostgreSQL + pgvector |
 | **Cache/Memory** | Upstash Redis |
-| **LLM (Free)** | Anthropic — Claude Haiku 4.5 |
-| **LLM (Pro)** | Anthropic — Claude Sonnet 4.6 |
+| **LLM (Free)** | Groq — Llama 3.3 70B Versatile |
+| **LLM (Pro)** | Anthropic — Claude Sonnet |
 | **Billing** | Stripe (subscriptions + webhooks) |
 | **Monorepo** | Turborepo + npm workspaces |
 | **Deployment** | Vercel (Edge + Serverless) |
@@ -166,7 +166,7 @@ Tools execute in parallel with 5-second timeouts and `Promise.allSettled` for gr
 
 - Node.js 18+
 - npm 10+
-- An [Anthropic API key](https://console.anthropic.com)
+- A [Groq API key](https://console.groq.com) (free)
 
 ### Installation
 
@@ -184,13 +184,14 @@ cp .env.example .env.local
 
 **Minimum required** (chat works with just this):
 ```env
-ANTHROPIC_API_KEY=sk-ant-...
+GROQ_API_KEY=gsk_...
 ```
 
 **Full setup** (all features):
 ```env
-# LLM Provider
-ANTHROPIC_API_KEY=sk-ant-...                   # Required — powers all tiers
+# LLM Providers
+GROQ_API_KEY=gsk_...                          # Required — free at console.groq.com
+ANTHROPIC_API_KEY=sk-ant-...                   # Optional — enables Claude for Pro tier
 
 # Supabase (auth, database, memory)
 NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
@@ -283,7 +284,7 @@ data: {"type":"done"}
 | Feature | Free | Pro ($9/mo) |
 |---------|------|-------------|
 | Messages | 20/hour | 200/hour |
-| LLM | Claude Haiku 4.5 | Claude Sonnet 4.6 |
+| LLM | Groq Llama 3.3 70B | Claude Sonnet |
 | Tools | Price, News, Sentiment | All 8 tools |
 | Memory | Short-term (24h) | Long-term (pgvector) |
 | Features | Basic chat | Watchlist, alerts, conversation history |
@@ -370,5 +371,5 @@ MIT
 ---
 
 <p align="center">
-  Built with <a href="https://nextjs.org">Next.js</a>, <a href="https://supabase.com">Supabase</a>, and <a href="https://anthropic.com">Claude</a>
+  Built with <a href="https://nextjs.org">Next.js</a>, <a href="https://supabase.com">Supabase</a>, and <a href="https://groq.com">Groq</a>
 </p>

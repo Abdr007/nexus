@@ -11,6 +11,7 @@
     "@nexus/shared": "*",
     "@nexus/tools": "*",
     "@nexus/memory": "*",
+    "groq-sdk": "^0.8.0",
     "@anthropic-ai/sdk": "^0.39.0"
   },
   "devDependencies": {

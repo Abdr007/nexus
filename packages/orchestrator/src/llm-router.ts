@@ -10,6 +10,71 @@ export interface LLMStreamOptions {
 export type Tier = 'free' | 'pro';
 
 /**
+ * Stream from Groq API using native fetch (works reliably on Vercel serverless).
+ */
+async function* streamGroq(
+  system: string,
+  user: string,
+  maxTokens: number,
+  temperature: number,
+): AsyncGenerator<{ token: string; model: string }> {
+  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'llama-3.3-70b-versatile',
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: user },
+      ],
+      max_tokens: maxTokens,
+      temperature,
+      stream: true,
+    }),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Groq API ${res.status}: ${errText}`);
+  }
+
+  const reader = res.body?.getReader();
+  if (!reader) throw new Error('No response body from Groq');
+
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || !trimmed.startsWith('data: ')) continue;
+      const data = trimmed.slice(6);
+      if (data === '[DONE]') return;
+
+      try {
+        const parsed = JSON.parse(data);
+        const token = parsed.choices?.[0]?.delta?.content;
+        if (token) {
+          yield { token, model: 'llama-3.3-70b' };
+        }
+      } catch {
+        // skip malformed chunks
+      }
+    }
+  }
+}
+
+/**
  * Stream from Anthropic API using native fetch.
  */
 async function* streamClaude(
@@ -17,7 +82,6 @@ async function* streamClaude(
   user: string,
   maxTokens: number,
   temperature: number,
-  model: string,
 ): AsyncGenerator<{ token: string; model: string }> {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -27,7 +91,7 @@ async function* streamClaude(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model,
+      model: 'claude-sonnet-4-6',
       max_tokens: maxTokens,
       temperature,
       system,
@@ -63,7 +127,7 @@ async function* streamClaude(
       try {
         const parsed = JSON.parse(data);
         if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
-          yield { token: parsed.delta.text, model };
+          yield { token: parsed.delta.text, model: 'claude-sonnet-4-6' };
         }
       } catch {
         // skip
@@ -73,9 +137,9 @@ async function* streamClaude(
 }
 
 /**
- * Routes to the best Claude model based on tier:
- * - Pro tier  → Claude Sonnet 4.6 (deeper analysis)
- * - Free tier → Claude Haiku 4.5 (fast, capable)
+ * Routes to the best available LLM based on tier:
+ * - Pro tier → Claude Sonnet (if available) → Groq fallback
+ * - Free tier → Groq Llama 3.3 70B
  */
 export async function* streamLLM(
   options: LLMStreamOptions,
@@ -83,20 +147,29 @@ export async function* streamLLM(
 ): AsyncGenerator<{ token: string; model: string }> {
   const { system, user, maxTokens, temperature } = options;
 
-  if (!process.env.ANTHROPIC_API_KEY) {
-    throw new Error('No LLM provider available — set ANTHROPIC_API_KEY');
+  // Pro tier: try Claude first
+  if (tier === 'pro' && process.env.ANTHROPIC_API_KEY) {
+    try {
+      log('info', 'Using Claude Sonnet for pro tier');
+      yield* streamClaude(system, user, maxTokens, temperature);
+      return;
+    } catch (err) {
+      log('warn', 'Claude failed, falling back to Groq', { error: (err as Error).message });
+    }
   }
 
-  const model = tier === 'pro' ? 'claude-sonnet-4-6' : 'claude-haiku-4-5-20251001';
-  log('info', `Using ${model} for ${tier} tier`);
-  yield* streamClaude(system, user, maxTokens, temperature, model);
+  // Free tier or Claude fallback: use Groq
+  if (!process.env.GROQ_API_KEY) {
+    throw new Error('No LLM provider available');
+  }
+
+  log('info', 'Using Groq Llama 3.3 70B');
+  yield* streamGroq(system, user, maxTokens, temperature);
 }
 
 export function getAvailableModels(): string[] {
   const models: string[] = [];
-  if (process.env.ANTHROPIC_API_KEY) {
-    models.push('claude-haiku-4-5 (Free)');
-    models.push('claude-sonnet-4-6 (Pro)');
-  }
+  if (process.env.GROQ_API_KEY) models.push('llama-3.3-70b (Groq)');
+  if (process.env.ANTHROPIC_API_KEY) models.push('claude-sonnet-4-6 (Anthropic)');
   return models;
 }

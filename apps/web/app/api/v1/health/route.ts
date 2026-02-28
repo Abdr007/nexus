@@ -5,7 +5,8 @@ export async function GET() {
     version: '1.0.0',
     phase: 'Phase 4 Complete',
     services: {
-      anthropic: !!process.env.ANTHROPIC_API_KEY,
+      groq: !!process.env.GROQ_API_KEY,
+      claude: !!process.env.ANTHROPIC_API_KEY,
       supabase: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
       redis: !!process.env.UPSTASH_REDIS_REST_URL,
       tavily: !!process.env.TAVILY_API_KEY,

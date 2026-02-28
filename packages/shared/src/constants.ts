@@ -50,8 +50,8 @@ Tone: Conservative, thorough, devil's advocate.`,
 
 export const DEFAULT_MODE: Mode = 'analyst';
 
-export const CLAUDE_MODEL_FREE = 'claude-haiku-4-5-20251001';
-export const CLAUDE_MODEL_PRO = 'claude-sonnet-4-6';
+export const GROQ_MODEL = 'llama-3.3-70b-versatile';
+export const CLAUDE_MODEL = 'claude-sonnet-4-6';
 
 export const TOKEN_LIMITS = {
   maxInputTokens: 3000,
