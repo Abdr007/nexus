@@ -33,9 +33,9 @@ export function AppShell() {
     }
   }, [messages, activeId, updateConversation]);
 
-  // Load messages when switching conversations
+  // Load messages when switching conversations (skip empty new ones)
   useEffect(() => {
-    if (activeConversation) {
+    if (activeConversation && activeConversation.messages.length > 0) {
       setMessages(activeConversation.messages);
     }
   }, [activeId]); // eslint-disable-line react-hooks/exhaustive-deps
